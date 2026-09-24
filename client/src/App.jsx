@@ -16,7 +16,7 @@ import Divisions from "./pages/Divisions";
 
 import "./App.css";
 
-const API_URL = "http://localhost:5000/api";
+const API_URL = "https://smart-timetable-generator-72ly.onrender.com/api";
 
 const days = [
     "Monday",
