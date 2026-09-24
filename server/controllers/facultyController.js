@@ -19,7 +19,9 @@ const createFaculty = async (req, res) => {
 
 const getFaculty = async (req, res) => {
     try {
-        const faculty = await Faculty.find().sort({ createdAt: -1 });
+        const faculty = await Faculty.find().sort({
+            createdAt: -1
+        });
 
         res.json({
             success: true,
@@ -34,7 +36,41 @@ const getFaculty = async (req, res) => {
     }
 };
 
+/* =====================================================
+   DELETE FACULTY
+===================================================== */
+
+const deleteFaculty = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const faculty = await Faculty.findByIdAndDelete(id);
+
+        if (!faculty) {
+            return res.status(404).json({
+                success: false,
+                message: "Faculty not found"
+            });
+        }
+
+        res.json({
+            success: true,
+            message: "Faculty deleted successfully",
+            data: faculty
+        });
+
+    } catch (error) {
+
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+
+    }
+};
+
 module.exports = {
     createFaculty,
-    getFaculty
+    getFaculty,
+    deleteFaculty
 };

@@ -26,6 +26,7 @@ function Faculty() {
     const [availableSlots, setAvailableSlots] = useState([]);
 
     const [loading, setLoading] = useState(false);
+    const [deletingId, setDeletingId] = useState(null);
     const [message, setMessage] = useState("");
     const [error, setError] = useState("");
 
@@ -40,7 +41,6 @@ function Faculty() {
             setFacultyList(response.data.data || []);
         } catch (err) {
             console.error(err);
-
             setError("Failed to load faculty members.");
         }
     };
@@ -118,7 +118,6 @@ function Faculty() {
             setAvailableSlots([]);
 
             await fetchFaculty();
-
         } catch (err) {
             console.error(err);
 
@@ -128,6 +127,39 @@ function Faculty() {
             );
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleDelete = async (faculty) => {
+        const confirmed = window.confirm(
+            `Are you sure you want to delete ${faculty.name} (${faculty.employeeId})?`
+        );
+
+        if (!confirmed) {
+            return;
+        }
+
+        setDeletingId(faculty._id);
+        setMessage("");
+        setError("");
+
+        try {
+            await axios.delete(`${API_URL}/faculty/${faculty._id}`);
+
+            setMessage(
+                `${faculty.name} has been deleted successfully.`
+            );
+
+            await fetchFaculty();
+        } catch (err) {
+            console.error(err);
+
+            setError(
+                err.response?.data?.message ||
+                "Failed to delete faculty member."
+            );
+        } finally {
+            setDeletingId(null);
         }
     };
 
@@ -471,6 +503,10 @@ function Faculty() {
                                         Available Slots
                                     </th>
 
+                                    <th>
+                                        Action
+                                    </th>
+
                                 </tr>
 
                             </thead>
@@ -509,6 +545,40 @@ function Faculty() {
                                                 slots
 
                                             </span>
+
+                                        </td>
+
+                                        <td>
+
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    handleDelete(faculty)
+                                                }
+                                                disabled={
+                                                    deletingId === faculty._id
+                                                }
+                                                style={{
+                                                    background: "#dc2626",
+                                                    color: "#ffffff",
+                                                    border: "none",
+                                                    borderRadius: "6px",
+                                                    padding: "8px 14px",
+                                                    cursor:
+                                                        deletingId === faculty._id
+                                                            ? "not-allowed"
+                                                            : "pointer",
+                                                    opacity:
+                                                        deletingId === faculty._id
+                                                            ? 0.6
+                                                            : 1,
+                                                    fontWeight: "600"
+                                                }}
+                                            >
+                                                {deletingId === faculty._id
+                                                    ? "Deleting..."
+                                                    : "Delete"}
+                                            </button>
 
                                         </td>
 

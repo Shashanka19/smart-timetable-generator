@@ -17,6 +17,7 @@ function Subjects() {
     });
 
     const [loading, setLoading] = useState(false);
+    const [deletingId, setDeletingId] = useState(null);
     const [message, setMessage] = useState("");
     const [error, setError] = useState("");
 
@@ -30,6 +31,7 @@ function Subjects() {
             const response = await axios.get(`${API_URL}/subjects`);
             setSubjects(response.data.data || []);
         } catch (err) {
+            console.error(err);
             setError("Failed to load subjects.");
         }
     };
@@ -39,6 +41,7 @@ function Subjects() {
             const response = await axios.get(`${API_URL}/faculty`);
             setFacultyList(response.data.data || []);
         } catch (err) {
+            console.error(err);
             setError("Failed to load faculty.");
         }
     };
@@ -81,14 +84,49 @@ function Subjects() {
                 facultyId: ""
             });
 
-            fetchSubjects();
+            await fetchSubjects();
         } catch (err) {
+            console.error(err);
+
             setError(
                 err.response?.data?.message ||
                 "Failed to add subject."
             );
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleDelete = async (subject) => {
+        const confirmed = window.confirm(
+            `Are you sure you want to delete ${subject.code} - ${subject.name}?`
+        );
+
+        if (!confirmed) {
+            return;
+        }
+
+        setDeletingId(subject._id);
+        setMessage("");
+        setError("");
+
+        try {
+            await axios.delete(`${API_URL}/subjects/${subject._id}`);
+
+            setMessage(
+                `${subject.code} has been deleted successfully.`
+            );
+
+            await fetchSubjects();
+        } catch (err) {
+            console.error(err);
+
+            setError(
+                err.response?.data?.message ||
+                "Failed to delete subject."
+            );
+        } finally {
+            setDeletingId(null);
         }
     };
 
@@ -110,20 +148,24 @@ function Subjects() {
             <div className="page-header">
                 <div>
                     <h1>Subject Management</h1>
+
                     <p>
                         Add and manage subjects used by the timetable generator.
                     </p>
                 </div>
             </div>
 
+
             {/* Add Subject */}
 
             <div className="content-card">
+
                 <h2>Add Subject</h2>
 
                 <form onSubmit={handleSubmit} className="form-grid">
 
                     <div className="form-group">
+
                         <label>Subject Code</label>
 
                         <input
@@ -134,9 +176,12 @@ function Subjects() {
                             onChange={handleChange}
                             required
                         />
+
                     </div>
 
+
                     <div className="form-group">
+
                         <label>Subject Name</label>
 
                         <input
@@ -147,9 +192,12 @@ function Subjects() {
                             onChange={handleChange}
                             required
                         />
+
                     </div>
 
+
                     <div className="form-group">
+
                         <label>Department</label>
 
                         <input
@@ -160,9 +208,12 @@ function Subjects() {
                             onChange={handleChange}
                             required
                         />
+
                     </div>
 
+
                     <div className="form-group">
+
                         <label>Type</label>
 
                         <select
@@ -173,9 +224,12 @@ function Subjects() {
                             <option value="THEORY">Theory</option>
                             <option value="LAB">Lab</option>
                         </select>
+
                     </div>
 
+
                     <div className="form-group">
+
                         <label>Hours Per Week</label>
 
                         <input
@@ -187,9 +241,12 @@ function Subjects() {
                             onChange={handleChange}
                             required
                         />
+
                     </div>
 
+
                     <div className="form-group">
+
                         <label>Faculty</label>
 
                         <select
@@ -197,6 +254,7 @@ function Subjects() {
                             value={form.facultyId}
                             onChange={handleChange}
                         >
+
                             <option value="">
                                 Select Faculty
                             </option>
@@ -210,10 +268,14 @@ function Subjects() {
                                     {faculty.department}
                                 </option>
                             ))}
+
                         </select>
+
                     </div>
 
+
                     <div className="form-actions">
+
                         <button
                             type="submit"
                             className="primary-button"
@@ -221,9 +283,11 @@ function Subjects() {
                         >
                             {loading ? "Adding..." : "Add Subject"}
                         </button>
+
                     </div>
 
                 </form>
+
 
                 {message && (
                     <div className="success-message">
@@ -231,50 +295,69 @@ function Subjects() {
                     </div>
                 )}
 
+
                 {error && (
                     <div className="error-message">
                         {error}
                     </div>
                 )}
+
             </div>
+
 
             {/* Subject List */}
 
             <div className="content-card">
 
                 <div className="section-header">
+
                     <div>
+
                         <h2>Subjects</h2>
+
                         <p>
                             {subjects.length} subject
                             {subjects.length !== 1 ? "s" : ""} configured
                         </p>
+
                     </div>
+
                 </div>
 
+
                 {subjects.length === 0 ? (
+
                     <div className="empty-state">
                         No subjects added yet.
                     </div>
+
                 ) : (
+
                     <div className="table-wrapper">
 
                         <table className="data-table">
 
                             <thead>
+
                                 <tr>
+
                                     <th>Code</th>
                                     <th>Name</th>
                                     <th>Department</th>
                                     <th>Type</th>
                                     <th>Hours / Week</th>
                                     <th>Faculty</th>
+                                    <th>Action</th>
+
                                 </tr>
+
                             </thead>
+
 
                             <tbody>
 
                                 {subjects.map((subject) => (
+
                                     <tr key={subject._id}>
 
                                         <td>
@@ -292,9 +375,11 @@ function Subjects() {
                                         </td>
 
                                         <td>
+
                                             <span className="status-badge">
                                                 {subject.type}
                                             </span>
+
                                         </td>
 
                                         <td>
@@ -307,7 +392,42 @@ function Subjects() {
                                             )}
                                         </td>
 
+                                        <td>
+
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    handleDelete(subject)
+                                                }
+                                                disabled={
+                                                    deletingId === subject._id
+                                                }
+                                                style={{
+                                                    background: "#dc2626",
+                                                    color: "#ffffff",
+                                                    border: "none",
+                                                    borderRadius: "6px",
+                                                    padding: "8px 14px",
+                                                    cursor:
+                                                        deletingId === subject._id
+                                                            ? "not-allowed"
+                                                            : "pointer",
+                                                    opacity:
+                                                        deletingId === subject._id
+                                                            ? 0.6
+                                                            : 1,
+                                                    fontWeight: "600"
+                                                }}
+                                            >
+                                                {deletingId === subject._id
+                                                    ? "Deleting..."
+                                                    : "Delete"}
+                                            </button>
+
+                                        </td>
+
                                     </tr>
+
                                 ))}
 
                             </tbody>
@@ -315,6 +435,7 @@ function Subjects() {
                         </table>
 
                     </div>
+
                 )}
 
             </div>

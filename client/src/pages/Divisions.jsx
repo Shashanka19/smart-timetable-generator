@@ -14,6 +14,7 @@ function Divisions() {
     });
 
     const [loading, setLoading] = useState(false);
+    const [deletingId, setDeletingId] = useState(null);
     const [message, setMessage] = useState("");
     const [error, setError] = useState("");
 
@@ -75,6 +76,42 @@ function Divisions() {
             );
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleDelete = async (division) => {
+        const confirmed = window.confirm(
+            `Are you sure you want to delete ${division.name}?`
+        );
+
+        if (!confirmed) {
+            return;
+        }
+
+        setDeletingId(division._id);
+        setMessage("");
+        setError("");
+
+        try {
+            await axios.delete(
+                `${API_URL}/divisions/${division._id}`
+            );
+
+            setMessage(
+                `${division.name} has been deleted successfully.`
+            );
+
+            await fetchDivisions();
+
+        } catch (err) {
+            console.error(err);
+
+            setError(
+                err.response?.data?.message ||
+                "Failed to delete division."
+            );
+        } finally {
+            setDeletingId(null);
         }
     };
 
@@ -290,6 +327,10 @@ function Divisions() {
                                         Students
                                     </th>
 
+                                    <th>
+                                        Action
+                                    </th>
+
                                 </tr>
 
                             </thead>
@@ -317,6 +358,40 @@ function Divisions() {
 
                                         <td>
                                             {division.studentCount}
+                                        </td>
+
+                                        <td>
+
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    handleDelete(division)
+                                                }
+                                                disabled={
+                                                    deletingId === division._id
+                                                }
+                                                style={{
+                                                    background: "#dc2626",
+                                                    color: "#ffffff",
+                                                    border: "none",
+                                                    borderRadius: "6px",
+                                                    padding: "8px 14px",
+                                                    cursor:
+                                                        deletingId === division._id
+                                                            ? "not-allowed"
+                                                            : "pointer",
+                                                    opacity:
+                                                        deletingId === division._id
+                                                            ? 0.6
+                                                            : 1,
+                                                    fontWeight: "600"
+                                                }}
+                                            >
+                                                {deletingId === division._id
+                                                    ? "Deleting..."
+                                                    : "Delete"}
+                                            </button>
+
                                         </td>
 
                                     </tr>

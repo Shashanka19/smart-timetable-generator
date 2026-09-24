@@ -15,6 +15,7 @@ function Rooms() {
     });
 
     const [loading, setLoading] = useState(false);
+    const [deletingId, setDeletingId] = useState(null);
     const [message, setMessage] = useState("");
     const [error, setError] = useState("");
 
@@ -78,6 +79,40 @@ function Rooms() {
             );
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleDelete = async (room) => {
+        const confirmed = window.confirm(
+            `Are you sure you want to delete ${room.name} (${room.roomNumber})?`
+        );
+
+        if (!confirmed) {
+            return;
+        }
+
+        setDeletingId(room._id);
+        setMessage("");
+        setError("");
+
+        try {
+            await axios.delete(`${API_URL}/rooms/${room._id}`);
+
+            setMessage(
+                `${room.name} has been deleted successfully.`
+            );
+
+            await fetchRooms();
+
+        } catch (err) {
+            console.error(err);
+
+            setError(
+                err.response?.data?.message ||
+                "Failed to delete room."
+            );
+        } finally {
+            setDeletingId(null);
         }
     };
 
@@ -269,6 +304,7 @@ function Rooms() {
                                     <th>Type</th>
                                     <th>Capacity</th>
                                     <th>Building</th>
+                                    <th>Action</th>
                                 </tr>
 
                             </thead>
@@ -301,6 +337,40 @@ function Rooms() {
 
                                         <td>
                                             {room.building || "—"}
+                                        </td>
+
+                                        <td>
+
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    handleDelete(room)
+                                                }
+                                                disabled={
+                                                    deletingId === room._id
+                                                }
+                                                style={{
+                                                    background: "#dc2626",
+                                                    color: "#ffffff",
+                                                    border: "none",
+                                                    borderRadius: "6px",
+                                                    padding: "8px 14px",
+                                                    cursor:
+                                                        deletingId === room._id
+                                                            ? "not-allowed"
+                                                            : "pointer",
+                                                    opacity:
+                                                        deletingId === room._id
+                                                            ? 0.6
+                                                            : 1,
+                                                    fontWeight: "600"
+                                                }}
+                                            >
+                                                {deletingId === room._id
+                                                    ? "Deleting..."
+                                                    : "Delete"}
+                                            </button>
+
                                         </td>
 
                                     </tr>

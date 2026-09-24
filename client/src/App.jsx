@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import axios from "axios";
 
 import {
@@ -28,13 +28,11 @@ const days = [
 
 const periods = [1, 2, 3, 4, 5, 6];
 
-
 /* =====================================================
    NAVIGATION
 ===================================================== */
 
 function Navigation() {
-
     const location = useLocation();
 
     const navItems = [
@@ -83,7 +81,6 @@ function Navigation() {
 
             </div>
 
-
             <div className="nav-links">
 
                 {navItems.map((item) => (
@@ -108,7 +105,6 @@ function Navigation() {
     );
 }
 
-
 /* =====================================================
    DASHBOARD
 ===================================================== */
@@ -116,6 +112,11 @@ function Navigation() {
 function Dashboard() {
 
     const [timetable, setTimetable] = useState([]);
+
+    const [facultyList, setFacultyList] = useState([]);
+
+    const [selectedFaculty, setSelectedFaculty] =
+        useState("ALL");
 
     const [stats, setStats] = useState({
         scheduled: 0,
@@ -130,6 +131,73 @@ function Dashboard() {
 
     const [error, setError] = useState("");
 
+    /* =================================================
+       LOAD FACULTY
+    ================================================= */
+
+    const loadFaculty = async () => {
+
+        try {
+
+            const response = await axios.get(
+                `${API_URL}/faculty`
+            );
+
+            const data = response.data;
+
+            /*
+             * Support different backend response formats:
+             *
+             * Array:
+             * [ {...}, {...} ]
+             *
+             * Wrapped:
+             * { faculty: [...] }
+             *
+             * Or:
+             * { data: [...] }
+             */
+
+            let facultyData = [];
+
+            if (Array.isArray(data)) {
+
+                facultyData = data;
+
+            } else if (Array.isArray(data?.faculty)) {
+
+                facultyData = data.faculty;
+
+            } else if (Array.isArray(data?.data)) {
+
+                facultyData = data.data;
+
+            }
+
+            setFacultyList(facultyData);
+
+        } catch (err) {
+
+            console.error(
+                "Faculty loading error:",
+                err
+            );
+
+            setFacultyList([]);
+
+        }
+
+    };
+
+    /* =================================================
+       LOAD FACULTY ON PAGE LOAD
+    ================================================= */
+
+    useEffect(() => {
+
+        loadFaculty();
+
+    }, []);
 
     /* =================================================
        GENERATE TIMETABLE
@@ -138,6 +206,7 @@ function Dashboard() {
     const generateTimetable = async () => {
 
         setLoading(true);
+
         setError("");
 
         try {
@@ -148,24 +217,18 @@ function Dashboard() {
 
             const result = response.data;
 
-            /*
-             * Backend returns:
-             *
-             * {
-             *   success: true,
-             *   scheduledCount: 6,
-             *   conflictCount: 0,
-             *   timetable: [...]
-             * }
-             */
-
             const generatedTimetable =
-                result.timetable || [];
+                Array.isArray(result.timetable)
+                    ? result.timetable
+                    : [];
 
             setTimetable(generatedTimetable);
 
-            setConflicts(result.conflicts || []);
-
+            setConflicts(
+                Array.isArray(result.conflicts)
+                    ? result.conflicts
+                    : []
+            );
 
             /* -----------------------------------------
                Calculate unique subjects
@@ -173,10 +236,13 @@ function Dashboard() {
 
             const uniqueSubjects = new Set(
                 generatedTimetable
-                    .map((entry) => entry.subject?.id)
+                    .map(
+                        (entry) =>
+                            entry.subject?.id ||
+                            entry.subject?._id
+                    )
                     .filter(Boolean)
             );
-
 
             /* -----------------------------------------
                Calculate unique rooms
@@ -184,17 +250,42 @@ function Dashboard() {
 
             const uniqueRooms = new Set(
                 generatedTimetable
-                    .map((entry) => entry.room?.id)
+                    .map(
+                        (entry) =>
+                            entry.room?.id ||
+                            entry.room?._id
+                    )
                     .filter(Boolean)
             );
 
-
             setStats({
-                scheduled: result.scheduledCount || 0,
-                conflicts: result.conflictCount || 0,
-                subjects: uniqueSubjects.size,
-                rooms: uniqueRooms.size
+
+                scheduled:
+                    Number(result.scheduledCount) || 0,
+
+                conflicts:
+                    Number(result.conflictCount) || 0,
+
+                subjects:
+                    uniqueSubjects.size,
+
+                rooms:
+                    uniqueRooms.size
+
             });
+
+            /*
+             * Reload faculty after generation so that
+             * newly added faculty members appear.
+             */
+
+            await loadFaculty();
+
+            /*
+             * Return to All Classes after generating.
+             */
+
+            setSelectedFaculty("ALL");
 
         } catch (err) {
 
@@ -213,25 +304,77 @@ function Dashboard() {
             setLoading(false);
 
         }
+
     };
 
+    /* =================================================
+       FILTER TIMETABLE BY FACULTY
+    ================================================= */
+
+    const filteredTimetable =
+        selectedFaculty === "ALL"
+            ? timetable
+            : timetable.filter((entry) => {
+
+                const facultyId =
+                    entry.faculty?.id ||
+                    entry.faculty?._id;
+
+                return (
+                    String(facultyId) ===
+                    String(selectedFaculty)
+                );
+
+            });
 
     /* =================================================
-       FIND CLASS FOR SLOT
+       FIND CLASS FOR DAY + PERIOD
     ================================================= */
 
     const getEntry = (day, period) => {
 
-        return timetable.find(
+        return filteredTimetable.find(
             (item) =>
                 item.day === day &&
-                Number(item.period) === Number(period)
+                Number(item.period) ===
+                    Number(period)
         );
 
     };
 
+    /* =================================================
+       GET SELECTED FACULTY
+    ================================================= */
+
+    const selectedFacultyObject =
+        facultyList.find((faculty) => {
+
+            const facultyId =
+                faculty._id ||
+                faculty.id;
+
+            return (
+                String(facultyId) ===
+                String(selectedFaculty)
+            );
+
+        });
+
+    /* =================================================
+       COUNT CLASSES
+    ================================================= */
+
+    const selectedFacultyClassCount =
+        selectedFaculty === "ALL"
+            ? timetable.length
+            : filteredTimetable.length;
+
+    /* =================================================
+       RENDER
+    ================================================= */
 
     return (
+
         <div className="dashboard-container">
 
             {/* =========================================
@@ -249,9 +392,10 @@ function Dashboard() {
                 </h1>
 
                 <p>
-                    Automatically generate conflict-free academic
-                    timetables using faculty availability, rooms,
-                    divisions and subject constraints.
+                    Automatically generate conflict-free
+                    academic timetables using faculty
+                    availability, rooms, divisions and
+                    subject constraints.
                 </p>
 
                 <button
@@ -268,7 +412,6 @@ function Dashboard() {
 
             </section>
 
-
             {/* =========================================
                 ERROR
             ========================================= */}
@@ -280,7 +423,6 @@ function Dashboard() {
                 </div>
 
             )}
-
 
             {/* =========================================
                 STATISTICS
@@ -300,7 +442,6 @@ function Dashboard() {
 
                 </div>
 
-
                 <div className="stat-card">
 
                     <div className="stat-label">
@@ -313,7 +454,6 @@ function Dashboard() {
 
                 </div>
 
-
                 <div className="stat-card">
 
                     <div className="stat-label">
@@ -325,7 +465,6 @@ function Dashboard() {
                     </div>
 
                 </div>
-
 
                 <div className="stat-card">
 
@@ -340,7 +479,6 @@ function Dashboard() {
                 </div>
 
             </section>
-
 
             {/* =========================================
                 WEEKLY TIMETABLE
@@ -357,13 +495,150 @@ function Dashboard() {
                         </h2>
 
                         <p>
-                            Monday to Friday academic schedule
+                            View the complete schedule or
+                            filter it by faculty.
                         </p>
 
                     </div>
 
                 </div>
 
+                {/* =====================================
+                    FACULTY FILTER
+                ===================================== */}
+
+                <div
+                    style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "12px",
+                        marginBottom: "20px",
+                        flexWrap: "wrap"
+                    }}
+                >
+
+                    <label
+                        htmlFor="facultyFilter"
+                        style={{
+                            fontWeight: "600"
+                        }}
+                    >
+                        Timetable View:
+                    </label>
+
+                    <select
+                        id="facultyFilter"
+                        value={selectedFaculty}
+                        onChange={(event) =>
+                            setSelectedFaculty(
+                                event.target.value
+                            )
+                        }
+                        style={{
+                            padding: "10px 14px",
+                            borderRadius: "8px",
+                            border:
+                                "1px solid #d1d5db",
+                            minWidth: "280px",
+                            background: "#ffffff",
+                            fontSize: "14px"
+                        }}
+                    >
+
+                        <option value="ALL">
+                            All Classes
+                        </option>
+
+                        {facultyList.map((faculty) => {
+
+                            const facultyId =
+                                faculty._id ||
+                                faculty.id;
+
+                            return (
+
+                                <option
+                                    key={facultyId}
+                                    value={facultyId}
+                                >
+                                    {faculty.name}
+                                    {" - "}
+                                    {faculty.employeeId}
+                                </option>
+
+                            );
+
+                        })}
+
+                    </select>
+
+                    <span
+                        style={{
+                            fontSize: "14px",
+                            color: "#64748b"
+                        }}
+                    >
+
+                        {selectedFaculty === "ALL"
+                            ? `${selectedFacultyClassCount} scheduled classes`
+                            : `${selectedFacultyClassCount} classes for ${
+                                selectedFacultyObject?.name ||
+                                "selected faculty"
+                            }`
+                        }
+
+                    </span>
+
+                </div>
+
+                {/* =====================================
+                    SELECTED FACULTY INFORMATION
+                ===================================== */}
+
+                {selectedFaculty !== "ALL" &&
+                    selectedFacultyObject && (
+
+                        <div
+                            style={{
+                                marginBottom: "20px",
+                                padding: "16px",
+                                borderRadius: "10px",
+                                background: "#f8fafc",
+                                border:
+                                    "1px solid #e2e8f0"
+                            }}
+                        >
+
+                            <strong>
+                                Faculty Timetable
+                            </strong>
+
+                            <div
+                                style={{
+                                    marginTop: "6px",
+                                    color: "#475569"
+                                }}
+                            >
+
+                                {selectedFacultyObject.name}
+
+                                {" • "}
+
+                                {selectedFacultyObject.employeeId}
+
+                                {" • "}
+
+                                {selectedFacultyObject.department}
+
+                            </div>
+
+                        </div>
+
+                    )}
+
+                {/* =====================================
+                    EMPTY / TABLE STATES
+                ===================================== */}
 
                 {timetable.length === 0 ? (
 
@@ -378,8 +653,29 @@ function Dashboard() {
                         </h3>
 
                         <p>
-                            Click "Generate Timetable" to create
-                            a conflict-free schedule.
+                            Click "Generate Timetable" to
+                            create a conflict-free schedule.
+                        </p>
+
+                    </div>
+
+                ) : selectedFaculty !== "ALL" &&
+                    filteredTimetable.length === 0 ? (
+
+                    <div className="empty-state">
+
+                        <div className="empty-state-icon">
+                            👨‍🏫
+                        </div>
+
+                        <h3>
+                            No classes scheduled
+                        </h3>
+
+                        <p>
+                            This faculty member currently
+                            has no classes in the generated
+                            timetable.
                         </p>
 
                     </div>
@@ -398,18 +694,21 @@ function Dashboard() {
                                         Day
                                     </th>
 
-                                    {periods.map((period) => (
+                                    {periods.map(
+                                        (period) => (
 
-                                        <th key={period}>
-                                            Period {period}
-                                        </th>
+                                            <th
+                                                key={period}
+                                            >
+                                                Period {period}
+                                            </th>
 
-                                    ))}
+                                        )
+                                    )}
 
                                 </tr>
 
                             </thead>
-
 
                             <tbody>
 
@@ -417,86 +716,76 @@ function Dashboard() {
 
                                     <tr key={day}>
 
-                                        <td className="day-cell">
+                                        <td
+                                            className="day-cell"
+                                        >
                                             {day}
                                         </td>
 
+                                        {periods.map(
+                                            (period) => {
 
-                                        {periods.map((period) => {
+                                                const entry =
+                                                    getEntry(
+                                                        day,
+                                                        period
+                                                    );
 
-                                            const entry =
-                                                getEntry(
-                                                    day,
-                                                    period
+                                                return (
+
+                                                    <td
+                                                        key={`${day}-${period}`}
+                                                        className="timetable-cell"
+                                                    >
+
+                                                        {entry ? (
+
+                                                            <div className="schedule-item">
+
+                                                                <strong>
+                                                                    {entry.subject?.code ||
+                                                                        "Subject"}
+                                                                </strong>
+
+                                                                <span>
+                                                                    {entry.subject?.name ||
+                                                                        ""}
+                                                                </span>
+
+                                                                <span>
+                                                                    Division:{" "}
+                                                                    {entry.division?.name ||
+                                                                        "—"}
+                                                                </span>
+
+                                                                <span>
+                                                                    Faculty:{" "}
+                                                                    {entry.faculty?.name ||
+                                                                        "—"}
+                                                                </span>
+
+                                                                <span>
+                                                                    Room:{" "}
+                                                                    {entry.room?.name ||
+                                                                        "—"}
+                                                                </span>
+
+                                                            </div>
+
+                                                        ) : (
+
+                                                            <span className="free-slot">
+                                                                Free
+                                                            </span>
+
+                                                        )}
+
+                                                    </td>
+
                                                 );
 
-
-                                            return (
-
-                                                <td
-                                                    key={`${day}-${period}`}
-                                                    className="timetable-cell"
-                                                >
-
-                                                    {entry ? (
-
-                                                        <div className="schedule-item">
-
-                                                            {/* SUBJECT */}
-
-                                                            <strong>
-                                                                {entry.subject?.code ||
-                                                                    "Subject"}
-                                                            </strong>
-
-
-                                                            <span>
-                                                                {entry.subject?.name ||
-                                                                    ""}
-                                                            </span>
-
-
-                                                            {/* DIVISION */}
-
-                                                            <span>
-                                                                Division:{" "}
-                                                                {entry.division?.name ||
-                                                                    "—"}
-                                                            </span>
-
-
-                                                            {/* FACULTY */}
-
-                                                            <span>
-                                                                Faculty:{" "}
-                                                                {entry.faculty?.name ||
-                                                                    "—"}
-                                                            </span>
-
-
-                                                            {/* ROOM */}
-
-                                                            <span>
-                                                                Room:{" "}
-                                                                {entry.room?.name ||
-                                                                    "—"}
-                                                            </span>
-
-                                                        </div>
-
-                                                    ) : (
-
-                                                        <span className="free-slot">
-                                                            Free
-                                                        </span>
-
-                                                    )}
-
-                                                </td>
-
-                                            );
-
-                                        })}
+                                            }
+                                        )}
 
                                     </tr>
 
@@ -511,7 +800,6 @@ function Dashboard() {
                 )}
 
             </section>
-
 
             {/* =========================================
                 CONFLICTS
@@ -530,13 +818,13 @@ function Dashboard() {
                             </h2>
 
                             <p>
-                                Issues detected during timetable generation
+                                Issues detected during
+                                timetable generation.
                             </p>
 
                         </div>
 
                     </div>
-
 
                     <div className="error-message">
 
@@ -544,9 +832,14 @@ function Dashboard() {
                             (conflict, index) => (
 
                                 <div key={index}>
-                                    {typeof conflict === "string"
+
+                                    {typeof conflict ===
+                                    "string"
                                         ? conflict
-                                        : JSON.stringify(conflict)}
+                                        : JSON.stringify(
+                                            conflict
+                                        )}
+
                                 </div>
 
                             )
@@ -557,7 +850,6 @@ function Dashboard() {
                 </section>
 
             )}
-
 
             {/* =========================================
                 CONSTRAINT INFORMATION
@@ -572,13 +864,13 @@ function Dashboard() {
                     </h3>
 
                     <p>
-                        Prevents faculty from being assigned
-                        to multiple classes at the same time
-                        and respects their availability.
+                        Prevents faculty from being
+                        assigned to multiple classes
+                        at the same time and respects
+                        their availability.
                     </p>
 
                 </div>
-
 
                 <div className="info-card">
 
@@ -593,7 +885,6 @@ function Dashboard() {
 
                 </div>
 
-
                 <div className="info-card">
 
                     <h3>
@@ -601,8 +892,8 @@ function Dashboard() {
                     </h3>
 
                     <p>
-                        Ensures each division has at most one
-                        class in a particular time slot.
+                        Ensures each division has at most
+                        one class in a particular time slot.
                     </p>
 
                 </div>
@@ -610,9 +901,9 @@ function Dashboard() {
             </section>
 
         </div>
+
     );
 }
-
 
 /* =====================================================
    APP
@@ -621,12 +912,12 @@ function Dashboard() {
 function App() {
 
     return (
+
         <BrowserRouter>
 
             <div className="app">
 
                 <Navigation />
-
 
                 <main className="main-content">
 
@@ -637,24 +928,20 @@ function App() {
                             element={<Dashboard />}
                         />
 
-
                         <Route
                             path="/faculty"
                             element={<Faculty />}
                         />
-
 
                         <Route
                             path="/subjects"
                             element={<Subjects />}
                         />
 
-
                         <Route
                             path="/rooms"
                             element={<Rooms />}
                         />
-
 
                         <Route
                             path="/divisions"
@@ -664,7 +951,6 @@ function App() {
                     </Routes>
 
                 </main>
-
 
                 <footer className="footer">
 
@@ -677,6 +963,7 @@ function App() {
             </div>
 
         </BrowserRouter>
+
     );
 }
 

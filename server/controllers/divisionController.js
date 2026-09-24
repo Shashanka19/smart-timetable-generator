@@ -34,7 +34,34 @@ const getDivisions = async (req, res) => {
     }
 };
 
+const deleteDivision = async (req, res) => {
+    try {
+        const division = await Division.findByIdAndDelete(
+            req.params.id
+        );
+
+        if (!division) {
+            return res.status(404).json({
+                success: false,
+                message: "Division not found"
+            });
+        }
+
+        res.status(200).json({
+            success: true,
+            message: "Division deleted successfully",
+            data: division
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+};
+
 module.exports = {
     createDivision,
-    getDivisions
+    getDivisions,
+    deleteDivision
 };
